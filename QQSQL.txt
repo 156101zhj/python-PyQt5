@@ -1,0 +1,70 @@
+# QQSQL.txt
+
+数据表:分为  用户信息表(users)  好友关系表(friends)   聊天记录表 (history)  
+
+数据库代码(直接复制使用即可)
+---------------------------------------------------------------------------------------------------------------
+create database RootDB default character set utf8;
+
+use RootDB;
+
+create table users(
+id int auto_increment primary key,
+rootname int,
+nickname varchar(20),
+pwd varchar(32),
+gender enum("男","女","保密"),
+tel varchar(11),
+address varchar(100),
+email varchar(30),
+birthday varchar(15),
+avatar text,
+style varchar(100),
+onlinestatus enum("在线","离线"),
+time timestamp default now(),
+last_online timestamp default now())character set utf8;
+
+insert into users(rootname,nickname,pwd,gender,tel,address,email,birthday,avatar,style,onlinestatus) values("10000","10000的昵称","123","男","13434557788","湖北省武汉市青山区东湖景园","488658752@qq.com","5月4日","images/avatar1.jpg","这个人很懒，什么都没留下！","离线")
+,("10001","10001的昵称","123","男","13438874114","湖北省武汉市洪山区光谷","789658752@qq.com","6月15日","images/avatar2.jpg","天空飘来5个字，这都不是事","离线"),("10002","10002的昵称","123","男","18974557788","北京市朝阳区吃瓜群众聚集地","983658752@qq.com","1月26日","images/avatar3.jpg","我是谁，我在干什么，这里是哪里！","离线");
+
+create table friends(
+id int auto_increment primary key,
+rootname int not null,
+f_rootname int not null)character set utf8;
+
+insert into friends(rootname,f_rootname) values("10000","10001"),("10000","10002"),("10001","10000"),("10001","10002"),("10002","10000"),("10002","10001");
+
+create table history(
+id int auto_increment primary key,
+rootname int not null,
+f_rootname int not null,
+record text,
+time timestamp default now())character set utf8;
+
+---------------------------------------------------------------------------------------------------------------
+
+数据库: RootDB
+create database RootDB default character set utf8;
+
+-----------------------------------------------------
+用户信息表(users):
+
+id(int)  rootname(int)(自动随机生成)  nickname(varchar(20)  pwd(varchar(16)(MD5加密) gender(enum("男","女","保密")))  tel(varchar(11))  address(varchar(100)   email(varchar(30))  birthday(varchar(15))   avatar(text)   style(varchar(100))   onlinestatus(enum(1,0)) time(timestamp)(注册时间) last_online(timestamp)
+-----------------------------------------------------
+
+好友关系表(friends):
+
+id(int)    rootname(int)       f_rootname(int)  
+0            10000                  10001
+1            10001                  10000
+
+------------------------------------------------
+
+历史记录表(history)
+
+id(int)   rootname(int)    f_rootname(int)     record(text)      time(timestamp)
+   0         10000             10001             你好                 ...
+   1         10000             10001             在干嘛               ...
+   2         10001             10000             在学习               ...
+
+select record from history where (rootname = 10000 and f_rootname = 10001) or (rootname = 10001 and f_rootname = 10000) order by id desc limit 5;

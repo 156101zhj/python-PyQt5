@@ -1,0 +1,45 @@
+#ChatLoginWindow{
+    background: url("images/bg.jpg") no-repeat
+
+}
+
+QLineEdit#txt_user{
+    background: transparent;
+    height: 35px;
+    line-height: 35px;
+    font-size: 20px;
+    border: 1px solid transparent;
+    border-bottom: 1px solid #9f9f9f
+}
+
+QLineEdit#txt_user:hover{
+    border-bottom: 1px solid #84d3fc
+}
+
+QLineEdit#txt_pwd{
+    background: transparent;
+    height: 35px;
+    line-height: 35px;
+    font-size: 16px;
+    border: 1px solid transparent;
+    border-bottom: 1px solid #9f9f9f
+}
+QLineEdit#txt_pwd:hover{
+    border-bottom: 1px solid #84d3fc
+}
+
+QCheckBox{
+    font-size: 18px;
+}
+QPushButton#btn_login{
+    background-color: #64caff;
+    border-radius: 8px;
+    border:1px solid transparent;
+    font-size: 18px;
+    font-weight: bold;
+    color: #fff
+}
+
+QPushButton#btn_login:hover{
+    background-color: #84d3fc
+}
