@@ -1,0 +1,85 @@
+﻿文件上传下载
+
+一.配置环境: python3
+	  pycharm --QtDesigner
+	  	  --pyUIc
+	  Qt5
+二.项目结构
+	|---server.py     服务端
+		|----do list       列出下载列表
+		|----do put        发送文件
+	|---client.py     客户端
+		|----loadfile      下载
+		|----save_path     保存路径
+		|----flush         刷新下载文档
+		|----jump_to_erji  跳转二级界面
+
+三.项目创建流程
+
+	第一阶段:
+		确定下载的传输协议:tcp传输
+		确定下载的思路:服务端负责列出可下载文件并发送文件,客户端负责读取可下载文件并发出命令.
+		server:|---file_list = os.listdir(FILE_PATH) 列出可下载列表
+			   |---self.connfd.send(data)			 发送文件
+		client:|---self.textBrowser = QtWidgets.QTextBrowser(self.centralwidget)-->self.textBrowser.append(file)  列出可下载列表
+			   |---data = s.recv(1024).decode()--> fd.write(data)                                                 下载文件
+		构建出能相互通信的服务器与客户端框架,测试套接字连接成功
+
+	第二阶段:
+		确定运行环境:基于python3 pyqt5模块开发
+		确定需求功能:下载需要获取可下载文件和下载路径
+		下载路径的确定:
+			openfile_name = QFileDialog.getExistingDirectory()              ---获取选择的路径
+		通过designer创建ui界面并获取代码
+
+	第三阶段:
+		在ui类下根据各个按键需求的功能编写方法(
+			这里需要注意的是服务端与客户端之间的
+		交互需要自己来协调,两端不断调试保持一致.
+		例如:
+			if not data or data[0] == 'Q'
+		        print(self.connfd.getpeername, "客户端退出")
+                self.connfd.close()
+                sys.exit(0)
+            elif data[0] == "L":
+                self.do_list()
+            elif data[0] == "G":
+                filename = data[2:]
+                self.do_get(filename)
+            这里规定了客户端发出的命令格式,因此在写客户端方法时要严格按照该方法执行
+             s.send(('G ' + word).encode())
+            此处G对应服务端命令格式,word对应命令内容
+		)
+		用clicked.connect方法绑定按钮与方法,实现点击按钮就运行方法
+		self.pushButton.clicked.connect(self.loadfile)
+		这段代码表示将pushButton绑定到loadfile方法上,点击pushButton按钮运行loadfile方法
+	第四阶段:
+		整体整合阶段,寻找可以优化的地方
+		在此阶段我们把下载功能放在二级界面中优化了其操作性
+
+    def jump_to_erji(self):
+        self.MainWindow.hide()
+        MainWindow1 = QtWidgets.QDialog()
+        ui = Ui_MainWindow1()
+        ui.setupUi(MainWindow1)
+        MainWindow1.show()
+        MainWindow1.exec_()
+        self.MainWindow.show()
+	    这一块注意，是重点从主界面跳转到Ui_MainWindow1界面，主界面隐藏，如果关闭MainWindow界面，主界面进程会触发self.form.show()会再次显示主界面
+	    新增了一个文本框让客户端选择的下载路径可视化
+			self.textBrowser_2 = QtWidgets.QTextBrowser(self.centralwidget)|
+			self.textBrowser_2.append(lujing)                              |---可视化路径
+	第五阶段:
+		把下载类导入到项目主窗口中
+		最开始我们用二级窗口通过导入类方法来实现打开二级界面
+		后来我觉得这种方法过于繁琐,而且上传下载功能本身就是一个独立的模块
+		于是我建议使用os.system()方法直接以打开文件的方式启动
+		最后我们在主界面的一个按钮上绑定openfile方法
+		def openfile(self):
+	        import os
+	        MainWindow.close()
+	        os.system("python xiazai.py")
+	    这样更加符合高聚合低耦合的要求
+
+	第六阶段:
+		联机测试:在不同的电脑上对服务器进行上传下载操作,成功则项目完成!

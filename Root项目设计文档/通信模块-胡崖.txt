@@ -1,0 +1,151 @@
+﻿聊天功能
+
+一.配置环境: python3
+	  pycharm --QtDesigner
+	  	  --pyUIc
+	  Qt5
+二.项目结构
+	|---server.py     服务端
+	|---module.mysqlRoot 数据库
+
+	|---client.py     客户端(登录界面)
+		|----module.haoyou_select    增删好友界面
+		|----module.pushbutton     注册界面
+
+	主要技术 : TCP socket 通信, PyQt5 图形化, Qss页面美化, 多线程,  IO多路复用,  数据库MySQL
+
+	设计流程 : 
+
+		客户端 : 登录请求, 注册请求, 聊天请求, 离线消息请求, 好友请求, 退出请求, 接收好友消息, 接收服务端响应消息
+
+		服务端 : 并发连接, 并响应客户端各种请求, 分别处理
+
+
+三.项目创建流程
+
+	第一阶段:
+		确定聊天的传输协议:tcp套接字
+		确定聊天的思路:服务端负责接收客户端发送的请求并反馈, 客户端负责发送操作请求.
+
+		server:|---serve_forever() 启动服务器, 利用IO多路复用并发
+		server:|---handle() 解析客户端请求码, 做响应函数操作
+		server:|---login()  比对数据库的用户名和密码, 成功则反馈给客户端相应信息
+		server:|---...()  类似login()操作
+
+		client:|---LoginWindow 登录页面类
+		client:|---Mychat 聊天页面类
+
+		构建出能相互通信的服务器与客户端框架, 测试多客户端并发套接字连接成功
+
+	第二阶段:
+		确定运行环境:基于python3 pyqt5模块开发
+		确定需求功能:聊天功能
+		创建登录界面, 创建聊天界面
+		通过designer创建ui界面并获取代码
+
+	第三阶段:
+		在ui类下根据各个按键需求的功能编写方法(
+			这里需要注意的是服务端与客户端之间的
+		交互需要自己来协调,两端不断调试保持一致.
+		例如:
+			登录功能:
+
+			    def login_click(self):
+			        '''
+			        登录功能
+			        :return:
+			        '''
+			        self.rootname = self.txt_user.text()
+			        pwd = self.txt_pwd.text()
+			        self.s.send(("L " + self.rootname + " " + pwd).encode())
+			        data = self.s.recv(128).decode()
+			        if data == "True":
+			            print("登陆成功")
+
+			            data = json.loads(self.s.recv(1024).decode())
+			            self.friends_list = data
+
+			            data = json.loads(self.s.recv(1024).decode())
+			            self.my_info = data
+
+			            # miss_msg = json.loads(self.s.recv(4096).decode())
+
+			            self.hide()
+			            self.dia = Mychat(self.my_info, self.s, self.friends_list)
+			            self.dia.show()
+
+			        else:
+			            print("登陆失败")
+
+			好友列表展示功能:
+			    def show_item(self):
+			        '''
+			        好友列表显示
+			        :return:
+			        '''
+			        self.listWidget1_1._set_items(self.friend_list)
+			        这里重写了PyQt的listWidget控件
+
+
+			好友间聊天功能:
+			    def chat(self, name, mac):
+			        '''
+			        选择好友聊天功能
+			        :param name: 好友昵称
+			        :param mac: 好友rootname
+			        :return:
+			        '''
+			        if mac =="1000":
+			            self.chat3()
+			        else:
+			            self.s.send(('C ' + self.my_info["rootname"] + " " + mac).encode())
+			            self.textBrowser.clear()
+			            time.sleep(0.5)
+			            for line in self.history_list:
+			                self.textBrowser.append(line)
+			... ...
+
+		在聊天列表控件用clicked.connect方法绑定方法,实现点击好友名就运行方法
+		self.list_widget.itemClicked.connect(self.item_doubleclick_slot)
+		这段代码表示将itemClicked绑定到chat方法上,点击items运行chat方法
+
+		客户端的接收消息方法,单独使用一个线程, 消息不会丢下
+
+	第四阶段:
+		整体整合阶段,寻找可以优化的地方
+		在此阶段我们把聊天功能进行了信息的分类, 如历史记录, 未接消息
+		并且增加了好友的增删, 新消息提醒等
+
+		# 历史记录
+        elif data["type"] == "H":
+            self.history_list = data["record"]
+        # 未接消息
+        elif data["type"] == "M":
+            for line in data["miss_msg"]:
+                self.textBrowser.append(line)
+        # 加好友消息
+        elif data["type"] == "F":
+            self.add.recvinfo(data["info"])
+            if data["info"]:
+                self.friend_list.append([data["info"][1] , data["info"][0], data["info"][7]])
+
+        # 聊天消息
+        elif data["type"] == "S":
+            if data["rootname"] == self.friend_info["rootname"]:
+                self.textBrowser.append(data["msg"])
+            elif data["rootname"] == self.my_info["rootname"]:
+                self.textBrowser.append("该好友未上线, 可能暂时无法回复您的信息\n")
+            else:
+                # 有新消息提示
+                self.textBrowser.append("有来自  %s  的一条新的消息" % data["rootname"] + "\n")
+
+	第五阶段:
+		在服务器增加个人小助手功能, 可以返回该用户在离线时候所有的未接消息, 然后为了增添它的功能, 在其中调用了图灵机器人的接口, 可以简单和用户聊天, 并满足用户的部分需求
+		为了使程序中数据传递更加方便, 把传递,接收反馈用的字符串, 改为用json格式的方式传递, 更好的处理发送和接收到的数据
+
+	第六阶段:
+		联机测试:在多台电脑上登录客户端, 实现登录注册聊天功能, 能够多用户之间相互聊天
+
+
+
+

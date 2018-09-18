@@ -1,0 +1,235 @@
+运行环境：
+	windows + ubuntu 16.0.4
+	Python 3.6.4 + mysql
+其他编译工具：
+	Sublime Text 3
+
+
+1.当聊天软件启动时，服务器要实时和数据库进行交互
+以下是创建与数据库连接的sql语句：
+def creatConnect():
+    conn = pymysql.connect(host="localhost", user="root",
+                           password="123456", db="RootDB", port=3307, charset="utf8")
+    cur = conn.cursor()
+    return (conn, cur)
+
+
+这个函数主要是创建库和表，用了异常语句，判定如果不存在库，则先创建库，再创建表。我们的数据库分为以下四个表格{用户信息表(users) 好友关系表(friends) 聊天记录表 (history)  图像存储表(image)
+}，数据库包括四个表格都会在服务器建立的时候创建。
+def main():
+    try:
+        conn, cur = creatConnect()
+        conn.commit()
+        create_users(conn)
+        create_friends(conn)
+        create_history(conn)
+        conn.commit()
+        # global conn
+    except:
+        conn = pymysql.connect(host="localhost", user="root",
+                               password="123456", port=3307, charset="utf8")
+        cur = conn.cursor()
+        cur.execute('create database RootDB character set utf8;')
+        cur.execute('use RootDB;')
+        conn.commit()
+        create_users(conn)
+        create_friends(conn)
+        create_history(conn)
+        conn.commit()
+    close(conn, cur)
+
+
+2.用户信息表包括以下字段(id,昵称，账号，密码，性别，电话，住址，邮箱，生日，个人心情，在线状态，时间)
+以下有个字段我想说明一下，就是在线状态，如果说客户端A要找客户端B聊天，肯定要先确认B的在线状态，我们当时也想了几个方法，比如发状态让服务端去记录，随后实时发送给每个客户端，经过讨论，在服务端数量过多的情况下，这个方法实施起来有困难，不方便。最后得出一个方便有效的方法，那就是把状态存入数据库，在客户端上线和下线的时候更新数据库，很好的解决了这个问题。这个表通过语句可以实现以下几个功能：在图形用户界面显示相关信息，查看好友信息等
+以下是创建个人信息表的sql语句
+def create_users(conn):
+    s = "create table users(\
+        id int auto_increment primary key,\
+        rootname int,\
+        nickname varchar(20),\
+        pwd varchar(32),\
+        gender enum('man','woman','sec'),\
+        tel varchar(11),\
+        address varchar(100),\
+        email varchar(30),\
+        birthday varchar(15),\
+        avatar text,\
+        style varchar(100),\
+        onlinestatus enum('off','on'),\
+        time timestamp)character set utf8;"
+    cur = conn.cursor()
+    try:
+        cur.execute(s)
+        conn.commit()
+        print('users ok')
+    except:
+        print("FILL")
+        conn.rollback()
+
+3.每当有人注册的时候，他的注册信息都会被插入到个人信息表中，以方便自己和好友的查看，以下是插入个人信息的sql语句
+def insert_users(rootname, nickname, pwd, gender, tel, address, email, birthday, avatar, style, onlinestatus):
+    conn, cur = creatConnect()
+    s = '''insert into users
+        (rootname,nickname,pwd,gender,rel,address,email,birthday,avatar,onlinestatus,time)
+        values("%s","%s","%s","%s","%s","%s","%s","%s","%s","%s","%s")''' % (rootname, nickname, pwd, gender, tel, address, email, birthday, avatar, style, onlinestatus)
+    try:
+        cur.execute(s)
+        conn.commit()
+        print("insert_users is ok")
+    except:
+        print("FILL")
+        conn.rollback()
+    close(conn, cur)
+
+4.因为个人信息是实时在变化的，所以我们需要根据用户情况来实时更新，以下更新个人信息的语句
+def updatestatus_users(rootname, status):
+    conn, cur = creatConnect()
+    s = "update users set onlinestatus='%s' where rootname='%s'" % (
+        status, rootname)
+    try:
+        cur.execute(s)
+        conn.commit()
+        print("update_users is ok")
+    except:
+        print("FILL")
+        conn.rollback()
+    close(conn, cur)
+
+5.如果说用户在准备找好友聊天的时候，用户首先要做的的肯定是需要确认要找的好友是否在线，所以我们个人信息表里面有一个字段是
+每个用户的在线状态，那就是把状态存入数据库，在客户端上线和下线的时候更新数据库，我们服务器通过在数据库的提取来显示该用户的在线状态，以下是服务器提取状态的sql语句
+def login(rootname, pwd):
+    conn, cur = creatConnect()
+    s = "select * from users where rootname='%s' and pwd='%s'" % (
+        rootname, pwd)
+    cur.execute(s)
+    data = cur.fetchone()
+    close(conn, cur)
+    return data
+
+6.以下是查看个人信息的sql语句，方便用户在网聊的时候去认识和了解陌生的聊天器好友
+def select_users(rootname):
+    conn, cur = creatConnect()
+    s = 'select * from users where rootname = "%s"' % rootname
+    cur.execute(s)
+    data = cur.fetchone()
+    close(conn, cur)
+    return data
+
+7.好友列表包括以下字段(我的账号，好友账号)，并且存入时必须是我的账号在前，好友账号在后，统一以后方便查看好友列表
+以下是创建好友表的sql语句
+def create_friends(conn):
+    s = '''create table friends(
+        id int auto_increment primary key,
+        rootname int not null,
+        f_rootname int not null)character set utf8;'''
+    cur = conn.cursor()
+    try:
+        cur.execute(s)
+        conn.commit()
+        print('create_friends is ok')
+    except:
+        print("FILL")
+        conn.rollback()
+
+8.我们的聊天器也实现了添加好友的功能，通过将好友之间关系存入数据库，来实现好友功能。以下是插入好友的sql，因为是一对多的形式，我们也思考了好友表的格式。起初想到的是每个人一张表，这样一来表格会显得过多，语句显得复杂，并且好友之间会有重复。后来我们决定了用下面的表的格式，假如用户b是用户a的好友，同样用户a也是用户b的好友，虽然这样添加也会显得记录重复，但是条理清晰很多，相比于之前每人一表的格式，此表看起来更精简。以下是表的格式和创建语句
+好友关系表(friends):
+id(int)    rootname(int)       f_rootname(int)  
+0            10000                  10001
+1            10001                  10000
+
+def insert_friends(rootname, f_rootname):
+    conn, cur = creatConnect()
+    s = 'insert into friends(rootname,f_rootname) values("%s","%s")' % (
+        rootname, f_rootname)
+    try:
+        cur.execute(s)
+        conn.commit()
+        print("insert_friends is ok")
+    except Exception as e:
+        print(e)
+        conn.rollback()
+    close(conn, cur)
+
+9.考虑到用户找好友聊天时的方便，我们在图形化界面添加了好友列表，这个功能就需要我们这条语句的配合，适时提取好友关系信息
+以下是查看提取好友关系表的sql语句：
+def select_friends(rootname):
+    conn, cur = creatConnect()
+    s = 'select * from friends where rootname = "%s"' % rootname
+    cur.execute(s)
+    data = cur.fetchall()
+    close(conn, cur)
+    return data
+
+10起初我对聊天记录的考虑仅限于用户查找历史聊天记录，后来项目组其他成员告诉我，在图像用户界面好友聊天框的切换，显示聊天记录也要用到历史记录，因为我们图形界面还没有实现多框功能，所以聊天记录这块就显得尤为重要。
+下面是历史记录表的格式：
+id(int)   rootname(int)    f_rootname(int)     record(text)      time(timestamp)
+   0         10000             10001             你好                 ...
+   1         10000             10001             在干嘛               ...
+   2         10001             10000             在学习               ...
+
+11.以下是创建历史记录表的sql语句：
+def create_history(conn):
+    s = '''create table history(
+        id int auto_increment primary key,
+        rootname int not null,
+        f_rootname int not null,
+        record text,
+        time timestamp not null)character set utf8;'''
+    cur = conn.cursor()
+    try:
+        cur.execute(s)
+        conn.commit()
+        print('create_hist ok')
+    except:
+        print("FILL")
+        conn.rollback()
+
+12下面是插入聊天记录的语句，看了上面大家知道我们把聊天双方都设置了字段，并且是有序的,这样的缺点就是记录会重复存储，浪费一定的计算机资源，优点是谁对谁的聊天记录清晰可见，查找检索起来也是相当方便。
+def insert_history(rootname, f_rootname, record):
+    conn, cur = creatConnect()
+    s = 'insert into history(rootname,f_rootname,record,time) values("%s","%s","%s","%s")' % (
+        rootname, f_rootname, record, time)
+    try:
+        cur.execute(s)
+        conn.commit()
+        print("insert_hist is ok")
+    except:
+        print("FILL")
+        conn.rollback()
+    close(conn, cur)
+
+13.下面是查找聊天记录的语句，因为我们是顺序存储，就算是聊天双方不变，也会有一个a->b和b->a的顺序，
+所以为了一次性查找到双方的聊天记录，就有了下面的select语句，此语句主要是为了实现用户查找聊天记录的功能
+def select_history(rootname, f_rootname):
+    conn, cur = creatConnect()
+    s = "select record from history where ((rootname = '%s')and(f_rootname = '%s')) or (( f_rootname = '%s')and(rootname = '%s'))" % (
+        rootname, f_rootname, f_rootname, rootname)
+    cur.execute(s)
+    data = cur.fetchall()
+    close(conn, cur)
+    return data
+
+14此语句也是查找历史记录的语句，为什么查找历史记录的语句会有两个，正如上面所说，我们历史记录主要是由两个功能，
+1.查找聊天记录，2.图形界面聊天记录的显示。而下面的语句正是为了实现图像界面聊天记录的显示。在用户与不同好友之间聊天时，
+随着用户聊天好友的切换，一个图形界面要显示与多个好友的聊天记录，每当切换时我们先清空聊天文本框，然后会调用此函数，来查找与该好友最近聊天的五条聊天记录，显示在图形界面，从而实现好友聊天界面的切换。
+def selectfive_history(rootname, f_rootname):
+    conn, cur = creatConnect()
+    s = "select record from history where ((rootname = '%s')and(f_rootname = '%s')) or (( f_rootname = '%s')and(rootname = '%s')) order by id desc limit 5;" % (
+        rootname, f_rootname, f_rootname, rootname)
+    cur.execute(s)
+    data = cur.fetchall()
+    close(conn, cur)
+    return data
+
+15.图像列表，用来存储每个用户的个性图像，每个用户都能设置自己的专属图像，我们单独为此建立了一个表格用来存放图像。
+以下是创建图像存储表的sql语句
+ create table image (
+  name varchar(255) DEFAULT NULL,
+  img mediumblob
+) character set utf8;
+
+
+16.以下是关闭游标和连接的语句
+def close(conn, cur):
+    cur.close()
+    conn.close()
